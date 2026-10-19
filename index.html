@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="体調予報">
+<meta name="robots" content="noindex">
+<title>体調予報</title>
+<style>
+:root{--bg:#f3f5f7;--panel:#fff;--ink:#1c2530;--sub:#5b6775;--line:#d9dfe5;--acc:#2b6f8e;--accbg:#e3f0f6;--warn:#9a5b00;--warnbg:#fff1d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#12181e;--panel:#1b232b;--ink:#e6ebf0;--sub:#9aa7b4;--line:#2d3944;--acc:#6bb6d6;--accbg:#1f3441;--warn:#f0c070;--warnbg:#3a2f18}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#12181e;--panel:#1b232b;--ink:#e6ebf0;--sub:#9aa7b4;--line:#2d3944;--acc:#6bb6d6;--accbg:#1f3441;--warn:#f0c070;--warnbg:#3a2f18}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Hiragino Sans","Yu Gothic",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.35rem;margin:0 0 6px}
+.note{color:var(--sub);font-size:.9rem;margin:0 0 18px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+input[type=file]{width:100%}
+select,input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:100%}
+button{font:inherit;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button{color:#0d1318}}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.sum b{font-size:1.1rem}
+.rank{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:var(--accbg);color:var(--acc);border-radius:999px;padding:2px 10px;font-size:.88rem}
+.row{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ex{grid-column:2;color:var(--sub);font-size:.85rem;overflow-wrap:anywhere}
+.flag{background:var(--warnbg);color:var(--warn);border-radius:6px;padding:0 8px;font-size:.8rem}
+.row.off .ctl,.row.off .ex{opacity:.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px}.alt{background:var(--accbg);color:var(--acc)}#msg{margin:8px 0 0;font-size:.9rem;color:var(--sub)}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button.alt{color:var(--acc)}}
+textarea{width:100%;height:120px;font:12px/1.5 ui-monospace,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+nav{display:flex;gap:6px;margin-bottom:14px}nav button{flex:1;padding:8px 4px}
+.btn{display:inline-block;padding:10px 16px;border-radius:8px;cursor:pointer}
+small{color:var(--sub)}
+</style>
+</head>
+<body>
+<main>
+<div id="lock" class="box"><h1>体調予報</h1><p class="note" id="lm"></p>
+<div class="ctl"><input type="password" id="pw" autocomplete="off" aria-label="パスフレーズ"><button id="go">開く</button></div><p id="le" class="flag" hidden></p></div>
+<div id="app" hidden>
+<nav><button data-t="top">予報</button><button data-t="rec" class="alt">記録</button><button data-t="ana" class="alt">傾向</button><button data-t="set" class="alt">設定</button></nav>
+<p class="note" id="wm"></p>
+<section id="top"></section>
+<section id="rec" hidden>
+<div class="box"><b>服薬を記録</b><div class="btns" id="mq"></div><div class="ctl"><input id="mn" list="ml" placeholder="薬の名前（任意）"><datalist id="ml"></datalist><button id="mt">今飲んだ</button></div><div id="mlist"></div></div>
+<div class="box"><b>LINEから取り込む</b><p class="note">書き出した.txtを選び、相手を指定します。解析は端末内で行い、原文は保存しません。</p><input type="file" id="f" accept=".txt,text/plain"></div>
+<div class="box" id="who" hidden><label>相手　<select id="p"></select></label></div>
+<div class="box sum" id="sum" hidden></div>
+<div class="box" id="list" hidden></div>
+<div class="box" id="act" hidden><button id="commit">確定して保存</button><p id="cm" role="status"></p></div>
+</section>
+<section id="ana" hidden></section>
+<section id="set" hidden>
+<div class="box"><b>相手の地域</b><div class="ctl"><input id="ln" placeholder="例: 柏市　または　35.867,139.976"><button id="ls">設定</button></div><p class="note" id="lr"></p></div>
+<div class="box"><b>お薬の登録</b><p class="note">登録すると、「記録」画面にワンタップのボタンが出ます。</p><div class="ctl"><input id="sn" placeholder="薬の名前"><button id="sa">追加</button></div><div id="sl"></div></div>
+<div class="box"><b>周期（月経）</b><p class="note">設定した周期を過去にさかのぼって当てはめ、症状との関係の分析にも使います。</p><div class="ctl"><label>直近の開始日 <input type="date" id="cs"></label><label>周期 <input type="number" id="cl" value="28" min="20" max="45" style="width:4.5em">日</label><label>期間 <input type="number" id="cd" value="6" min="2" max="10" style="width:4.5em">日</label></div><button id="cv">保存</button><p class="note" id="cr"></p></div>
+<div class="box"><b>バックアップ</b><div class="btns"><button id="bx">書き出す</button><label class="alt btn">復元<input type="file" id="bi" hidden></label></div><p class="note">書き出したファイルは暗号化されています。復元後は、そのときのパスフレーズで開きます。</p></div>
+<div class="box"><button id="wipe" class="alt">すべて削除</button></div>
+</section>
+</div>
+</main>
+<script>
+const SY=[["頭痛","頭痛|頭いた|頭が痛|ずつう"],["だるさ","だるい|ダルい|だるさ|だるー|だりぃ|倦怠|しんどい|ぐったり"],["眠気","眠い|ねむい|眠たい|ねむたい|眠気"],["めまい","めまい|目眩|ふらふら|ふらつ"],["吐き気","吐き気|はきけ|気持ち悪い|むかむか|吐いた"],["肩こり","肩こり|肩凝り|肩が凝|肩が痛"],["腹痛","腹痛|お腹痛|おなか痛|お腹が痛|胃痛|胃が痛"]].map(([t,r])=>[t,new RegExp(r)]);
+const TAGS=SY.map(s=>s[0]).concat(["薬","良好"]);
+const NEG=/ない|なくなっ|治っ|治まっ|引いた|マシ|良くなっ|楽になっ/;
+const MED=/薬[^\n]{0,12}(飲んだ|のんだ|飲みました|服用)|(飲んだ|のんだ|飲みました)[^\n]{0,4}薬/;
+const MEDNO=/飲んで(ない|ません)|飲み忘れ|まだ飲/;
+const GOOD=/元気|調子(いい|良い|よい)|良くなった|楽になった|すっきり/;
+const HEAVY=/かなり|すごく|めっちゃ|やばい|ひどい|最悪|激しい/,LIGHT=/ちょっと|少し|軽く|ちょい/;
+let rows=[],items=[];
+const $=id=>document.getElementById(id);
+const ymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+function parse(t){const o=[];let d=null,cur=null;
+for(const raw of t.split(/\r?\n/)){
+const dm=raw.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})/);
+if(dm){d=new Date(+dm[1],dm[2]-1,+dm[3]);cur=null;continue}
+const m=raw.match(/^(\d{1,2}):(\d{2})\t([^\t]*)\t([\s\S]*)$/);
+if(m&&d){cur={d,h:+m[1],mi:m[2],who:m[3],text:m[4]};o.push(cur);continue}
+if(cur&&raw)cur.text+="\n"+raw}
+return o}
+function ext(r){const t=r.text,res=[];let sh=0,past="";
+if(/一昨日|おととい/.test(t))sh=-2;else if(/昨日|きのう/.test(t))sh=-1;
+if(/先週|この前|前に/.test(t))past="過去の話かも";
+if(r.h<5)sh-=1;
+const d=new Date(r.d);d.setDate(d.getDate()+sh);
+const sev=HEAVY.test(t)?"重":LIGHT.test(t)?"軽":"中";
+const mk=(kind,tag,s,flag)=>res.push({date:ymd(d),kind,tag,sev:s,time:r.h+":"+r.mi,text:t.slice(0,60),flag,on:!flag});
+let hit=false;
+for(const [tag,re] of SY){const m=t.match(re);if(m){hit=true;const a=t.slice(m.index+m[0].length,m.index+m[0].length+10);mk("症状",tag,sev,NEG.test(a)?"否定かも":past)}}
+if(MED.test(t))mk("服薬","薬","",MEDNO.test(t)?"否定かも":past);
+if(!hit&&GOOD.test(t))mk("良好","良好","",past);
+return res}
+$("f").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+rows=parse(await f.text());
+const c={};rows.forEach(r=>c[r.who]=(c[r.who]||0)+1);
+const names=Object.keys(c);
+if(!names.length){alert("発言を読み取れませんでした。LINEの「トーク履歴を送信」で書き出した.txtを選んでください。");return}
+$("p").innerHTML='<option value="">選んでください</option>'+names.map(n=>`<option value="${n.replace(/"/g,"&quot;")}">${n.replace(/</g,"&lt;")}（${c[n]}件）</option>`).join("");
+$("who").hidden=false;["sum","list","act"].forEach(i=>$(i).hidden=true)};
+$("p").onchange=e=>{const w=e.target.value;if(!w)return;
+items=rows.filter(r=>r.who===w).flatMap(ext);render();["sum","list","act"].forEach(i=>$(i).hidden=false)};
+function opt(a,v){return a.map(x=>`<option${x===v?" selected":""}>${x}</option>`).join("")}
+function render(){
+$("list").innerHTML=items.length?items.map((x,i)=>`<div class="row${x.on?"":" off"}" data-i="${i}"><input type="checkbox" ${x.on?"checked":""} aria-label="採用">
+<div class="ctl"><input type="date" value="${x.date}"><select data-k="tag">${opt(TAGS,x.tag)}</select>${x.kind==="症状"?`<select data-k="sev">${opt(["軽","中","重"],x.sev)}</select>`:""}${x.kind==="服薬"?`<span>${x.time}頃</span>`:""}${x.flag?`<span class="flag">${x.flag}</span>`:""}</div>
+<div class="ex"></div></div>`).join(""):"<p>候補が見つかりませんでした。</p>";
+document.querySelectorAll(".ex").forEach((el,i)=>el.textContent=items[i].text);
+stat()}
+function stat(){const on=items.filter(x=>x.on&&x.kind==="症状"),c={};on.forEach(x=>c[x.tag]=(c[x.tag]||0)+1);
+const days=new Set(on.map(x=>x.date)).size;
+$("sum").innerHTML=`採用した症状の記録: <b>${on.length}</b>件 / 症状のあった日: <b>${days}</b>日<div class="rank">${Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="chip">${k} ${v}</span>`).join("")}</div>`}
+$("list").addEventListener("change",e=>{const r=e.target.closest(".row");if(!r)return;const x=items[+r.dataset.i];
+if(e.target.type==="checkbox"){x.on=e.target.checked;r.classList.toggle("off",!x.on)}
+else if(e.target.type==="date")x.date=e.target.value;
+else if(e.target.dataset.k)x[e.target.dataset.k]=e.target.value;
+stat()});
+
+const T=new Date(),today=ymd(T),F={dp:["気圧の前日差","hPa"],tr:["日較差","℃"],h:["湿度","%"],mp:["月経期間中",""],pm:["月経前5日間",""]};
+let S=null,KEY=null,SALT=null,H={};
+const IND=f=>f==="mp"||f==="pm",fm=(f,v,day)=>IND(f)?(day?"予定あり":Math.round(v*100)+"%"):v.toFixed(1)+F[f][1];
+function cyc(k){const c=S&&S.cy;if(!c||!c.start)return{mp:0,pm:0};const a=k.split("-"),b=c.start.split("-"),n=Math.round((new Date(+a[0],a[1]-1,+a[2])-new Date(+b[0],b[1]-1,+b[2]))/864e5),q=((n%c.len)+c.len)%c.len;return{mp:q<c.dur?1:0,pm:q>=c.len-5?1:0}}
+const cb=k=>{const c=cyc(k);return c.mp?'<span class="chip">月経期間（予定）</span> ':c.pm?'<span class="chip">月経前（予定）</span> ':""};
+const enc=new TextEncoder(),dec=new TextDecoder(),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const b64=u=>{let s="";for(const x of u)s+=String.fromCharCode(x);return btoa(s)},ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const esc=s=>s.replace(/[&<>"]/g,c=>"&#"+c.charCodeAt(0)+";");
+const dk=async(pw,salt)=>crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]),{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+async function persist(){const iv=crypto.getRandomValues(new Uint8Array(12)),c=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},KEY,enc.encode(JSON.stringify(S))));localStorage.hv=JSON.stringify({s:b64(SALT),i:b64(iv),c:b64(c)})}
+const raw=localStorage.hv,err=m=>{$("le").textContent=m;$("le").hidden=false};
+$("lm").textContent=raw?"パスフレーズを入力してください。":"新しいパスフレーズ（6文字以上）を決めてください。忘れるとデータは復元できません。";
+$("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6)return err("6文字以上にしてください");
+try{if(raw){const o=JSON.parse(raw);SALT=ub(o.s);KEY=await dk(pw,SALT);S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(o.i)},KEY,ub(o.c))))}
+else{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(pw,SALT);S={loc:null,recs:[],med:[],meds:[]};await persist()}}catch(e){return err("パスフレーズが違います")}
+$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();refresh()};
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("section").forEach(s=>s.hidden=s.id!==b.dataset.t);document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("alt",x!==b))});
+const J=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()};
+function put(o){o.hourly.time.forEach((k,i)=>{const p=o.hourly.surface_pressure[i],t=o.hourly.temperature_2m[i],h=o.hourly.relative_humidity_2m[i];if(p!=null&&t!=null&&h!=null)H[k]={p,t,h}})}
+async function wx(){H={};const L=S.loc,q=`latitude=${L.lat}&longitude=${L.lon}&timezone=auto&hourly=surface_pressure,temperature_2m,relative_humidity_2m`,first=S.recs.map(r=>r.date).sort()[0],e=new Date(T);e.setDate(e.getDate()-7);
+if(first&&first<=ymd(e))put(await J(`https://archive-api.open-meteo.com/v1/archive?${q}&start_date=${first}&end_date=${ymd(e)}`));
+put(await J(`https://api.open-meteo.com/v1/forecast?${q}&past_days=14&forecast_days=8`))}
+async function refresh(){if(S.loc){try{await wx();$("wm").textContent="気象データ: "+S.loc.name}catch(e){H={};$("wm").textContent="気象データを取得できませんでした（"+(e&&e.message||e)+"）。通信を確認してください。"}}else $("wm").textContent="";drawTop();drawAna()}
+function daily(){const D={},g={};for(const k in H)(g[k.slice(0,10)]=g[k.slice(0,10)]||[]).push(H[k]);const ds=Object.keys(g).sort();
+ds.forEach(d=>{const a=g[d];if(a.length<20)return;const m=f=>a.reduce((s,x)=>s+x[f],0)/a.length,ts=a.map(x=>x.t);D[d]={p:m("p"),h:m("h"),tr:Math.max(...ts)-Math.min(...ts),...cyc(d)}});
+ds.forEach((d,i)=>{if(D[d]&&D[ds[i-1]])D[d].dp=D[d].p-D[ds[i-1]].p});return D}
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length,sdv=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/Math.max(1,a.length-1))},ex=(r,v)=>r.dir>0?v>=r.th:v<=r.th;
+function stats(){const D=daily(),sy={},gd=new Set(),R=[],ok=d=>D[d]&&D[d].dp!=null;
+S.recs.forEach(r=>{if(r.kind==="症状")(sy[r.tag]=sy[r.tag]||new Set()).add(r.date);else if(r.kind==="良好")gd.add(r.date)});
+for(const tag in sy){const A=[...sy[tag]].filter(ok);if(A.length<5)continue;let B=[...gd].filter(d=>ok(d)&&!sy[tag].has(d)),bn="良好と書かれた日";
+if(B.length<10){B=Object.keys(D).filter(d=>ok(d)&&d<today&&!sy[tag].has(d));bn="症状の記載がない日"}
+if(B.length<5)continue;
+for(const grp of [["dp","tr","h"],["mp","pm"]]){if(grp[0]==="mp"&&!(S.cy&&S.cy.start))continue;let best=null;
+for(const f of grp){const a=A.map(d=>D[d][f]),b=B.map(d=>D[d][f]),ma=mean(a),mb=mean(b),sp=Math.sqrt(((a.length-1)*sdv(a)**2+(b.length-1)*sdv(b)**2)/(a.length+b.length-2))||1,d=(ma-mb)/sp;
+if(!best||Math.abs(d)>Math.abs(best.d))best={tag,n:A.length,f,mA:ma,mB:mb,d,th:(ma+mb)/2,dir:Math.sign(ma-mb)||1,bn,a}}
+best.rc=best.a.filter(v=>ex(best,v)).length/best.a.length;R.push(best)}}
+return R.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d))}
+function tm(k){const ks=Object.keys(H).sort();let b=0,bi=-1;ks.forEach((q,i)=>{if(q.startsWith(k)&&i>=3){const v=H[ks[i-3]].p-H[q].p;if(v>b){b=v;bi=i}}});return bi>=0&&b>=2?`。気圧の低下が最大の時間帯: ${ks[bi].slice(11,13)}時ごろ（3時間で−${b.toFixed(1)}hPa）`:""}
+function drawTop(){const el=$("top");if(!S.loc){el.innerHTML='<div class="box">設定で相手の地域を決めると、予報が出ます。</div>';return}
+const R=stats(),D=daily();let h="";
+for(let i=0;i<7;i++){const d=new Date(T);d.setDate(d.getDate()+i);const k=ymd(d),x=D[k],fl=x?R.filter(r=>Math.abs(r.d)>=.3&&x[r.f]!=null&&ex(r,x[r.f])):[];
+h+=`<div class="box"><b>${d.getMonth()+1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）</b> `+cb(k)+(!x?'<span class="flag">気象データなし</span>':fl.length?"":'<span class="chip">目立つ要因なし</span>')+
+fl.map(r=>`<p><span class="chip">${r.tag}</span> 注意度: ${Math.abs(r.d)>=.6?"高":"中"}<br><small>${F[r.f][0]} ${fm(r.f,x[r.f],1)}（症状の日 ${fm(r.f,r.mA)} ／ それ以外 ${fm(r.f,r.mB)}）。過去の症状日の${Math.round(r.rc*100)}%が該当${r.f==="dp"&&r.dir<0?tm(k):""}</small></p>`).join("")+"</div>"}
+el.innerHTML=h+(R.length?"":'<p class="note">傾向を出すには、症状の記録が各5日以上必要です。</p>')+'<p class="note">過去の傾向に基づく目安です。医療判断の代わりにはなりません。</p>'}
+function drawAna(){const R=stats();$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>最も差が大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small></div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
+const nowL=()=>{const d=new Date();return ymd(d)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+function drawMeds(){$("mq").innerHTML=S.meds.map(n=>`<button data-n="${esc(n)}">${esc(n)}</button>`).join("");$("sl").innerHTML=S.meds.map(n=>`<div class="ctl"><span>${esc(n)}</span><button class="alt" data-n="${esc(n)}">削除</button></div>`).join("");$("ml").innerHTML=S.meds.map(n=>`<option value="${esc(n)}">`).join("");const a=[...S.med].sort((x,y)=>y.t.localeCompare(x.t)).slice(0,15);
+$("mlist").innerHTML=a.map(m=>`<div class="ctl" data-id="${m.id}"><input type="datetime-local" value="${m.t}"><span></span><button class="alt" data-x="1">削除</button></div>`).join("");
+document.querySelectorAll("#mlist [data-id]").forEach((e,i)=>e.querySelector("span").textContent=(a[i].name||"薬")+(a[i].src==="LINE"?"（LINE）":""))}
+$("mt").onclick=async()=>{const n=$("mn").value.trim();S.med.push({id:uid(),t:nowL(),name:n,src:"手入力"});if(n&&!S.meds.includes(n))S.meds.push(n);await persist();$("mn").value="";drawMeds()};
+$("mq").onclick=async e=>{if(e.target.dataset.n){S.med.push({id:uid(),t:nowL(),name:e.target.dataset.n,src:"手入力"});await persist();drawMeds()}};
+$("sa").onclick=async()=>{const n=$("sn").value.trim();if(n&&!S.meds.includes(n)){S.meds.push(n);await persist();$("sn").value="";drawMeds()}};
+$("sl").onclick=async e=>{const n=e.target.dataset.n;if(n){S.meds=S.meds.filter(x=>x!==n);await persist();drawMeds()}};
+$("cv").onclick=async()=>{const s=$("cs").value,l=+$("cl").value,d=+$("cd").value;if(!s||!(l>=20&&l<=45)||!(d>=2&&d<=10))return $("cr").textContent="開始日・周期（20〜45日）・期間（2〜10日）を入れてください";S.cy={start:s,len:l,dur:d};await persist();$("cr").textContent="保存しました";refresh()};
+$("mlist").addEventListener("click",async e=>{const r=e.target.closest("[data-id]");if(r&&e.target.dataset.x){S.med=S.med.filter(m=>m.id!==r.dataset.id);await persist();drawMeds()}});
+$("mlist").addEventListener("change",async e=>{const r=e.target.closest("[data-id]"),m=r&&S.med.find(x=>x.id===r.dataset.id);if(m&&e.target.value){m.t=e.target.value;await persist();drawMeds()}});
+$("commit").onclick=async()=>{let a=0;for(const x of items.filter(x=>x.on)){const k=x.tag==="薬"?"服薬":x.tag==="良好"?"良好":"症状";
+if(k==="服薬"){const t=x.date+"T"+x.time.replace(/^(\d):/,"0$1:");if(!S.med.some(m=>m.t===t))S.med.push({id:uid(),t,name:"",src:"LINE"})}
+else if(!S.recs.some(r=>r.date===x.date&&r.tag===x.tag&&r.kind===k))S.recs.push({date:x.date,kind:k,tag:x.tag,sev:x.sev});a++}
+await persist();drawMeds();$("cm").textContent=a+"件を保存しました（原文は保存していません）";items=[];["sum","list"].forEach(i=>$(i).hidden=true);refresh()};
+$("ls").onclick=async()=>{const v=$("ln").value.trim(),m=v.match(/^(-?\d+(?:\.\d+)?)\s*[,、 ]\s*(-?\d+(?:\.\d+)?)$/),hint="緯度,経度（例: 35.867,139.976）を直接入力しても設定できます";
+try{let loc;if(m)loc={name:"緯度"+m[1]+"・経度"+m[2],lat:+m[1],lon:+m[2]};
+else{const r=(await J("https://geocoding-api.open-meteo.com/v1/search?count=5&language=ja&name="+encodeURIComponent(v))).results;if(!r)return $("lr").textContent="見つかりませんでした。"+hint;const g=r.find(x=>x.country_code==="JP")||r[0];loc={name:g.name+(g.admin1?"（"+g.admin1+"）":""),lat:g.latitude,lon:g.longitude}}
+S.loc=loc;await persist();$("lr").textContent="現在: "+S.loc.name;refresh()}catch(e){$("lr").textContent="取得できませんでした（"+(e&&e.message||e)+"）。"+hint}};
+$("bx").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([localStorage.hv],{type:"application/octet-stream"}));a.download="taityo-backup-"+today+".hvk";a.click()};
+$("bi").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!(o.s&&o.i&&o.c))throw 0;if(confirm("現在のデータを、このバックアップで置き換えます。"))localStorage.hv=JSON.stringify(o),location.reload()}catch(x){alert("バックアップファイルを読み込めませんでした")}};
+$("wipe").onclick=()=>{if(confirm("端末内のすべてのデータを削除します。元に戻せません。")){localStorage.removeItem("hv");location.reload()}};
+</script>
+</body>
+</html>
