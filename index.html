@@ -48,6 +48,7 @@ small{color:var(--sub)}
 <p class="note" id="wm"></p>
 <section id="top"></section>
 <section id="rec" hidden>
+<div class="box"><b>体調を記録</b><p class="note">日付を選び、当てはまる症状を押します。記録は、傾向の分析と予報に使われます。</p><div class="ctl"><input type="date" id="ed"><select id="es"><option>軽</option><option selected>中</option><option>重</option></select></div><div class="btns" id="eq"></div><div id="el"></div></div>
 <div class="box"><b>服薬を記録</b><div class="btns" id="mq"></div><div class="ctl"><input id="mn" list="ml" placeholder="薬の名前（任意）"><datalist id="ml"></datalist><button id="mt">今飲んだ</button></div><div id="mlist"></div></div>
 <div class="box"><b>LINEから取り込む</b><p class="note">書き出した.txtを選び、相手を指定します。解析は端末内で行い、原文は保存しません。</p><input type="file" id="f" accept=".txt,text/plain"></div>
 <div class="box" id="who" hidden><label>相手　<select id="p"></select></label></div>
@@ -121,9 +122,11 @@ else if(e.target.type==="date")x.date=e.target.value;
 else if(e.target.dataset.k)x[e.target.dataset.k]=e.target.value;
 stat()});
 
-const T=new Date(),today=ymd(T),F={dp:["気圧の前日差","hPa"],tr:["日較差","℃"],h:["湿度","%"],mp:["月経期間中",""],pm:["月経前5日間",""]};
+const T=new Date(),today=ymd(T),F={dp:["気圧の前日差","hPa"],tr:["日較差","℃"],h:["湿度","%"],t:["平均気温","℃"],dt:["気温の前日差","℃"],pr:["降水量","mm"],cl:["雲量","%"],ws:["最大風速","km/h"],mp:["月経期間中",""],pm:["月経前5日間",""]};
 let S=null,KEY=null,SALT=null,H={};
-const IND=f=>f==="mp"||f==="pm",fm=(f,v,day)=>IND(f)?(day?"予定あり":Math.round(v*100)+"%"):v.toFixed(1)+F[f][1];
+const WL=c=>c<0?"":c<=1?"晴れ":c<=3?"曇り":c<=48?"霧":c<=67||(c>=80&&c<=82)?"雨":c<=77||c===85||c===86?"雪":"雷雨",ago=n=>{const d=new Date(T);d.setDate(d.getDate()-n);return ymd(d)},
+mixT=(r,D)=>{const c=ds=>{const o={};ds.forEach(d=>{const w=D[d]&&D[d].wl;if(w)o[w]=(o[w]||0)+1});return o},a=c(r.ad),b=c(r.bd),ks=Object.keys(a).sort((x,y)=>a[y]-a[x]);return ks.length?"<br><small>天気の内訳（症状の日 ／ "+r.bn+"）: "+ks.map(k=>k+" "+Math.round(a[k]/r.ad.length*100)+"% ／ "+Math.round((b[k]||0)/r.bd.length*100)+"%").join("、")+"</small>":""},
+IND=f=>f==="mp"||f==="pm",fm=(f,v,day)=>IND(f)?(day?"予定あり":Math.round(v*100)+"%"):v.toFixed(1)+F[f][1];
 function cyc(k){const c=S&&S.cy;if(!c||!c.start)return{mp:0,pm:0};const a=k.split("-"),b=c.start.split("-"),n=Math.round((new Date(+a[0],a[1]-1,+a[2])-new Date(+b[0],b[1]-1,+b[2]))/864e5),q=((n%c.len)+c.len)%c.len;return{mp:q<c.dur?1:0,pm:q>=c.len-5?1:0}}
 const cb=k=>{const c=cyc(k);return c.mp?'<span class="chip">月経期間（予定）</span> ':c.pm?'<span class="chip">月経前（予定）</span> ':""};
 const enc=new TextEncoder(),dec=new TextDecoder(),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -136,41 +139,47 @@ $("lm").textContent=raw?"パスフレーズを入力してください。":"新�
 $("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6)return err("6文字以上にしてください");
 try{if(raw){const o=JSON.parse(raw);SALT=ub(o.s);KEY=await dk(pw,SALT);S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(o.i)},KEY,ub(o.c))))}
 else{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(pw,SALT);S={loc:null,recs:[],med:[],meds:[]};await persist()}}catch(e){return err("パスフレーズが違います")}
-$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();refresh()};
+$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();refresh()};
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("section").forEach(s=>s.hidden=s.id!==b.dataset.t);document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("alt",x!==b))});
 const J=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()};
-function put(o){o.hourly.time.forEach((k,i)=>{const p=o.hourly.surface_pressure[i],t=o.hourly.temperature_2m[i],h=o.hourly.relative_humidity_2m[i];if(p!=null&&t!=null&&h!=null)H[k]={p,t,h}})}
-async function wx(){H={};const L=S.loc,q=`latitude=${L.lat}&longitude=${L.lon}&timezone=auto&hourly=surface_pressure,temperature_2m,relative_humidity_2m`,first=S.recs.map(r=>r.date).sort()[0],e=new Date(T);e.setDate(e.getDate()-7);
+function put(o){const q=o.hourly;q.time.forEach((k,i)=>{const g=n=>q[n]?q[n][i]:null,p=g("surface_pressure"),t=g("temperature_2m"),h=g("relative_humidity_2m");if(p!=null&&t!=null&&h!=null)H[k]={p,t,h,pr:g("precipitation")||0,cl:g("cloud_cover")||0,ws:g("wind_speed_10m")||0,wc:g("weather_code")==null?-1:g("weather_code")}})}
+async function wx(){H={};const L=S.loc,q=`latitude=${L.lat}&longitude=${L.lon}&timezone=auto&hourly=surface_pressure,temperature_2m,relative_humidity_2m,weather_code,precipitation,cloud_cover,wind_speed_10m`,first=S.recs.map(r=>r.date).sort()[0],e=new Date(T);e.setDate(e.getDate()-7);
 if(first&&first<=ymd(e))put(await J(`https://archive-api.open-meteo.com/v1/archive?${q}&start_date=${first}&end_date=${ymd(e)}`));
 put(await J(`https://api.open-meteo.com/v1/forecast?${q}&past_days=14&forecast_days=8`))}
 async function refresh(){if(S.loc){try{await wx();$("wm").textContent="気象データ: "+S.loc.name}catch(e){H={};$("wm").textContent="気象データを取得できませんでした（"+(e&&e.message||e)+"）。通信を確認してください。"}}else $("wm").textContent="";drawTop();drawAna()}
 function daily(){const D={},g={};for(const k in H)(g[k.slice(0,10)]=g[k.slice(0,10)]||[]).push(H[k]);const ds=Object.keys(g).sort();
-ds.forEach(d=>{const a=g[d];if(a.length<20)return;const m=f=>a.reduce((s,x)=>s+x[f],0)/a.length,ts=a.map(x=>x.t);D[d]={p:m("p"),h:m("h"),tr:Math.max(...ts)-Math.min(...ts),...cyc(d)}});
-ds.forEach((d,i)=>{if(D[d]&&D[ds[i-1]])D[d].dp=D[d].p-D[ds[i-1]].p});return D}
+ds.forEach(d=>{const a=g[d];if(a.length<20)return;const m=f=>a.reduce((s,x)=>s+x[f],0)/a.length,ts=a.map(x=>x.t),pr=a.reduce((s,x)=>s+x.pr,0),c={};a.forEach(x=>c[x.wc]=(c[x.wc]||0)+1);let mc=-1,mn=0;for(const k in c)if(c[k]>mn){mn=c[k];mc=+k}const lab=WL(mc);
+D[d]={p:m("p"),h:m("h"),t:m("t"),cl:m("cl"),pr,ws:Math.max(...a.map(x=>x.ws)),tr:Math.max(...ts)-Math.min(...ts),wl:pr>=1?(lab==="雪"||lab==="雷雨"?lab:"雨"):lab,...cyc(d)}});
+ds.forEach((d,i)=>{if(D[d]&&D[ds[i-1]]){D[d].dp=D[d].p-D[ds[i-1]].p;D[d].dt=D[d].t-D[ds[i-1]].t}});return D}
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length,sdv=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/Math.max(1,a.length-1))},ex=(r,v)=>r.dir>0?v>=r.th:v<=r.th;
 function stats(){const D=daily(),sy={},gd=new Set(),R=[],ok=d=>D[d]&&D[d].dp!=null;
 S.recs.forEach(r=>{if(r.kind==="症状")(sy[r.tag]=sy[r.tag]||new Set()).add(r.date);else if(r.kind==="良好")gd.add(r.date)});
 for(const tag in sy){const A=[...sy[tag]].filter(ok);if(A.length<5)continue;let B=[...gd].filter(d=>ok(d)&&!sy[tag].has(d)),bn="良好と書かれた日";
 if(B.length<10){B=Object.keys(D).filter(d=>ok(d)&&d<today&&!sy[tag].has(d));bn="症状の記載がない日"}
 if(B.length<5)continue;
-for(const grp of [["dp","tr","h"],["mp","pm"]]){if(grp[0]==="mp"&&!(S.cy&&S.cy.start))continue;let best=null;
+for(const grp of [["dp","tr","h","t","dt","pr","cl","ws"],["mp","pm"]]){if(grp[0]==="mp"&&!(S.cy&&S.cy.start))continue;const L=[];
 for(const f of grp){const a=A.map(d=>D[d][f]),b=B.map(d=>D[d][f]),ma=mean(a),mb=mean(b),sp=Math.sqrt(((a.length-1)*sdv(a)**2+(b.length-1)*sdv(b)**2)/(a.length+b.length-2))||1,d=(ma-mb)/sp;
-if(!best||Math.abs(d)>Math.abs(best.d))best={tag,n:A.length,f,mA:ma,mB:mb,d,th:(ma+mb)/2,dir:Math.sign(ma-mb)||1,bn,a}}
-best.rc=best.a.filter(v=>ex(best,v)).length/best.a.length;R.push(best)}}
+L.push({tag,n:A.length,f,mA:ma,mB:mb,d,th:(ma+mb)/2,dir:Math.sign(ma-mb)||1,bn,a,ad:A,bd:B})}
+L.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d)).slice(0,grp[0]==="mp"?1:2).forEach(b=>{b.rc=b.a.filter(v=>ex(b,v)).length/b.a.length;R.push(b)})}}
 return R.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d))}
 function tm(k){const ks=Object.keys(H).sort();let b=0,bi=-1;ks.forEach((q,i)=>{if(q.startsWith(k)&&i>=3){const v=H[ks[i-3]].p-H[q].p;if(v>b){b=v;bi=i}}});return bi>=0&&b>=2?`。気圧の低下が最大の時間帯: ${ks[bi].slice(11,13)}時ごろ（3時間で−${b.toFixed(1)}hPa）`:""}
 function drawTop(){const el=$("top");if(!S.loc){el.innerHTML='<div class="box">設定で相手の地域を決めると、予報が出ます。</div>';return}
 const R=stats(),D=daily();let h="";
 for(let i=0;i<7;i++){const d=new Date(T);d.setDate(d.getDate()+i);const k=ymd(d),x=D[k],fl=x?R.filter(r=>Math.abs(r.d)>=.3&&x[r.f]!=null&&ex(r,x[r.f])):[];
-h+=`<div class="box"><b>${d.getMonth()+1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）</b> `+cb(k)+(!x?'<span class="flag">気象データなし</span>':fl.length?"":'<span class="chip">目立つ要因なし</span>')+
+h+=`<div class="box"><b>${d.getMonth()+1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）</b> `+cb(k)+(x?`<small>${x.wl?x.wl+"・":""}${x.t.toFixed(0)}℃・降水${x.pr.toFixed(0)}mm</small> `:"")+(!x?'<span class="flag">気象データなし</span>':fl.length?"":'<span class="chip">目立つ要因なし</span>')+
 fl.map(r=>`<p><span class="chip">${r.tag}</span> 注意度: ${Math.abs(r.d)>=.6?"高":"中"}<br><small>${F[r.f][0]} ${fm(r.f,x[r.f],1)}（症状の日 ${fm(r.f,r.mA)} ／ それ以外 ${fm(r.f,r.mB)}）。過去の症状日の${Math.round(r.rc*100)}%が該当${r.f==="dp"&&r.dir<0?tm(k):""}</small></p>`).join("")+"</div>"}
 el.innerHTML=h+(R.length?"":'<p class="note">傾向を出すには、症状の記録が各5日以上必要です。</p>')+'<p class="note">過去の傾向に基づく目安です。医療判断の代わりにはなりません。</p>'}
-function drawAna(){const R=stats();$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>最も差が大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small></div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
+function drawAna(){const R=stats(),D=daily(),seen={};$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>差の大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small>${IND(r.f)||seen[r.tag]++?"":mixT(r,D)}</div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。要因が多いほど偶然の差も出やすいため、記録が少ないうちは参考程度に。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
 const nowL=()=>{const d=new Date();return ymd(d)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 function drawMeds(){$("mq").innerHTML=S.meds.map(n=>`<button data-n="${esc(n)}">${esc(n)}</button>`).join("");$("sl").innerHTML=S.meds.map(n=>`<div class="ctl"><span>${esc(n)}</span><button class="alt" data-n="${esc(n)}">削除</button></div>`).join("");$("ml").innerHTML=S.meds.map(n=>`<option value="${esc(n)}">`).join("");const a=[...S.med].sort((x,y)=>y.t.localeCompare(x.t)).slice(0,15);
 $("mlist").innerHTML=a.map(m=>`<div class="ctl" data-id="${m.id}"><input type="datetime-local" value="${m.t}"><span></span><button class="alt" data-x="1">削除</button></div>`).join("");
 document.querySelectorAll("#mlist [data-id]").forEach((e,i)=>e.querySelector("span").textContent=(a[i].name||"薬")+(a[i].src==="LINE"?"（LINE）":""))}
 $("mt").onclick=async()=>{const n=$("mn").value.trim();S.med.push({id:uid(),t:nowL(),name:n,src:"手入力"});if(n&&!S.meds.includes(n))S.meds.push(n);await persist();$("mn").value="";drawMeds()};
+function drawEnt(){if(!$("ed").value)$("ed").value=today;$("eq").innerHTML=TAGS.filter(x=>x!=="薬").map(x=>`<button class="${x==="良好"?"alt":""}" data-t="${x}">${x}</button>`).join("");
+const a=S.recs.map((r,i)=>({r,i})).filter(x=>x.r.date>=ago(14)).sort((x,y)=>y.r.date.localeCompare(x.r.date)).slice(0,20);
+$("el").innerHTML=a.map(x=>`<div class="ctl" data-i="${x.i}"><span>${x.r.date.slice(5)} ${x.r.tag}${x.r.kind==="症状"?"（"+x.r.sev+"）":""}</span><button class="alt" data-x="1">削除</button></div>`).join("")}
+$("eq").onclick=async e=>{const g=e.target.dataset.t;if(!g)return;const date=$("ed").value||today,k=g==="良好"?"良好":"症状",sev=$("es").value,r=S.recs.find(x=>x.date===date&&x.tag===g&&x.kind===k);if(r)r.sev=sev;else S.recs.push({date,kind:k,tag:g,sev});await persist();drawEnt();drawTop();drawAna()};
+$("el").onclick=async e=>{const r=e.target.closest("[data-i]");if(r&&e.target.dataset.x){S.recs.splice(+r.dataset.i,1);await persist();drawEnt();drawTop();drawAna()}};
 $("mq").onclick=async e=>{if(e.target.dataset.n){S.med.push({id:uid(),t:nowL(),name:e.target.dataset.n,src:"手入力"});await persist();drawMeds()}};
 $("sa").onclick=async()=>{const n=$("sn").value.trim();if(n&&!S.meds.includes(n)){S.meds.push(n);await persist();$("sn").value="";drawMeds()}};
 $("sl").onclick=async e=>{const n=e.target.dataset.n;if(n){S.meds=S.meds.filter(x=>x!==n);await persist();drawMeds()}};
@@ -180,7 +189,7 @@ $("mlist").addEventListener("change",async e=>{const r=e.target.closest("[data-i
 $("commit").onclick=async()=>{let a=0;for(const x of items.filter(x=>x.on)){const k=x.tag==="薬"?"服薬":x.tag==="良好"?"良好":"症状";
 if(k==="服薬"){const t=x.date+"T"+x.time.replace(/^(\d):/,"0$1:");if(!S.med.some(m=>m.t===t))S.med.push({id:uid(),t,name:"",src:"LINE"})}
 else if(!S.recs.some(r=>r.date===x.date&&r.tag===x.tag&&r.kind===k))S.recs.push({date:x.date,kind:k,tag:x.tag,sev:x.sev});a++}
-await persist();drawMeds();$("cm").textContent=a+"件を保存しました（原文は保存していません）";items=[];["sum","list"].forEach(i=>$(i).hidden=true);refresh()};
+await persist();drawMeds();drawEnt();$("cm").textContent=a+"件を保存しました（原文は保存していません）";items=[];["sum","list"].forEach(i=>$(i).hidden=true);refresh()};
 $("ls").onclick=async()=>{const v=$("ln").value.trim(),m=v.match(/^(-?\d+(?:\.\d+)?)\s*[,、 ]\s*(-?\d+(?:\.\d+)?)$/),hint="緯度,経度（例: 35.867,139.976）を直接入力しても設定できます";
 try{let loc;if(m)loc={name:"緯度"+m[1]+"・経度"+m[2],lat:+m[1],lon:+m[2]};
 else{const r=(await J("https://geocoding-api.open-meteo.com/v1/search?count=5&language=ja&name="+encodeURIComponent(v))).results;if(!r)return $("lr").textContent="見つかりませんでした。"+hint;const g=r.find(x=>x.country_code==="JP")||r[0];loc={name:g.name+(g.admin1?"（"+g.admin1+"）":""),lat:g.latitude,lon:g.longitude}}
