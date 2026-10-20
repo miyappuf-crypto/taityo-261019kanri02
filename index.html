@@ -35,6 +35,8 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .btns{display:flex;flex-wrap:wrap;gap:8px}.alt{background:var(--accbg);color:var(--acc)}#msg{margin:8px 0 0;font-size:.9rem;color:var(--sub)}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button.alt{color:var(--acc)}}
 textarea{width:100%;height:120px;font:12px/1.5 ui-monospace,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px}
 nav{display:flex;gap:6px;margin-bottom:14px}nav button{flex:1;padding:8px 2px;font-size:.85rem}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:0 0 10px}.fl{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0}
+@media print{body{background:#fff;color:#000}#app>*:not(#rpt){display:none}#rpt>*:not(#rout){display:none}#rout{border:0}#rout .btns,#rout .note{display:none}}
 #cov{position:fixed;inset:0;background:var(--bg);display:none;z-index:9}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}.cal i{font-style:normal;text-align:center;color:var(--sub);font-size:.8rem}
 .day{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 2px;min-height:58px;display:flex;flex-direction:column;align-items:center}
@@ -51,7 +53,7 @@ small{color:var(--sub)}
 <div id="lock" class="box"><h1>体調予報</h1><p class="note" id="lm"></p>
 <div class="ctl"><input type="password" id="pw" autocomplete="off" aria-label="パスフレーズ"><button id="go">開く</button></div><p id="le" class="flag" hidden></p></div>
 <div id="app" hidden>
-<nav><button data-t="top">予報</button><button data-t="rec" class="alt">記録</button><button data-t="cal" class="alt">月間</button><button data-t="ana" class="alt">傾向</button><button data-t="set" class="alt">設定</button></nav>
+<nav><button data-t="top">予報</button><button data-t="rec" class="alt">記録</button><button data-t="cal" class="alt">月間</button><button data-t="ana" class="alt">傾向</button><button data-t="rpt" class="alt">通院</button><button data-t="set" class="alt">設定</button></nav>
 <p class="note" id="wm"></p>
 <section id="top"><div id="chart"></div><div id="fc"></div></section>
 <section id="rec" hidden>
@@ -66,6 +68,13 @@ small{color:var(--sub)}
 </section>
 <section id="cal" hidden></section>
 <section id="ana" hidden></section>
+<section id="rpt" hidden>
+<div class="box"><b>通院用の出力</b><p class="note">受診のときに伝える用に、症状が出た時期をまとめます。</p>
+<div class="ctl"><label>期間 <input type="date" id="rf"></label>〜<input type="date" id="rt" aria-label="終了日"><button class="alt" id="r3">3か月</button><button class="alt" id="r6">6か月</button></div>
+<div class="ctl"><label>まとめ方 <select id="rm"><option value="s">症状ごと</option><option value="d">日付順</option><option value="b">両方</option><option value="m">月ごとの傾向</option><option value="w">週ごとの傾向</option></select></label><label><input type="checkbox" id="rmed" checked> 服薬も含める</label><label><input type="checkbox" id="rcy"> 月経期間（予定）も含める</label></div>
+<div class="fl" id="rtg"></div><button id="rg">作成</button></div>
+<div class="box" id="rout" hidden><pre id="rtx"></pre><div class="btns"><button id="rcp">コピー</button><button id="rsh" class="alt">共有</button><button id="rpr" class="alt">印刷・PDF</button><button id="rcs" class="alt">CSVを保存</button></div><p id="rmsg" class="note"></p></div>
+</section>
 <section id="set" hidden>
 <div class="box"><b>相手の地域</b><div class="ctl"><input id="ln" placeholder="例: 柏市　または　35.867,139.976"><button id="ls">設定</button></div><p class="note" id="lr"></p></div>
 <div class="box"><b>お薬の登録</b><p class="note">登録すると、「記録」画面にワンタップのボタンが出ます。</p><div class="ctl"><input id="sn" placeholder="薬の名前"><button id="sa">追加</button></div><div id="sl"></div></div>
@@ -149,7 +158,7 @@ $("lm").textContent=raw?"パスフレーズを入力してください。":"新�
 $("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6||(!raw&&pw.length<10))return err(raw?"6文字以上で入力してください":"10文字以上にしてください");
 try{if(raw){const o=JSON.parse(raw);SALT=ub(o.s);KEY=await dk(pw,SALT);S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(o.i)},KEY,ub(o.c))))}
 else{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(pw,SALT);S={loc:null,recs:[],med:[],meds:[]};await persist()}}catch(e){return err("パスフレーズが違います")}
-$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.lock)$("lk").value=S.lock;arm();if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();drawTrips();refresh()};
+$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.lock)$("lk").value=S.lock;arm();if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();drawTrips();drawRpt();refresh()};
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("section").forEach(s=>s.hidden=s.id!==b.dataset.t);document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("alt",x!==b))});
 const J=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()};
 function put(o,dst){const q=o.hourly,Z=dst||H;q.time.forEach((k,i)=>{const g=n=>q[n]?q[n][i]:null,p=g("surface_pressure"),t=g("temperature_2m"),h=g("relative_humidity_2m");if(p!=null&&t!=null&&h!=null)Z[k]={p,t,h,pr:g("precipitation")||0,cl:g("cloud_cover")||0,ws:g("wind_speed_10m")||0,wc:g("weather_code")==null?-1:g("weather_code")}})}
@@ -208,7 +217,7 @@ function drawDay(){const el=$("cdt");if(!cd){el.textContent="日付を選ぶと�
 const D=daily()[cd],r=S.recs.filter(x=>x.date===cd),md=S.med.filter(x=>x.t.slice(0,10)===cd).sort((a,b)=>a.t.localeCompare(b.t));
 el.innerHTML="<b>"+cd+"</b>"+(tripAt(cd)?" 📍"+esc(tripAt(cd).name):"")+"<br>"+(D?`<small>${D.wl||""} ${D.t.toFixed(0)}℃ 湿度${D.h.toFixed(0)}% 降水${D.pr.toFixed(0)}mm 気圧${D.p.toFixed(0)}hPa${D.dp!=null?"（前日差 "+D.dp.toFixed(1)+"）":""}</small><br>`:"")+(r.length?r.map(x=>x.tag+(x.kind==="症状"?"（"+x.sev+"）":"")).join("、"):"記録なし")+(md.length?"<br>服薬: "+md.map(x=>x.t.slice(11)+(x.name?" "+esc(x.name):"")).join("、"):"")+(cyc(cd).mp?"<br><small>月経期間（予定）</small>":"")}
 $("cal").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.m){cm=new Date(cm.getFullYear(),cm.getMonth()+ +b.dataset.m,1);cd=null}else if(b.dataset.d)cd=b.dataset.d;drawCal()};
-const _da=drawAna;drawAna=function(){_da();drawCal()};
+const _da=drawAna;drawAna=function(){_da();drawCal();drawRpt()};
 let idle=null,hid=0;const arm=()=>{clearTimeout(idle);if(S)idle=setTimeout(()=>location.reload(),(S.lock||3)*6e4)};
 ["click","touchstart","keydown"].forEach(e=>addEventListener(e,arm,{passive:true}));
 document.addEventListener("visibilitychange",()=>{const c=$("cov");if(document.hidden){hid=Date.now();c.style.display="block"}else{c.style.display="none";if(S&&Date.now()-hid>3e4)location.reload()}});
@@ -228,6 +237,40 @@ function drawTrips(){const a=[...(S.trips||[])].sort((x,y)=>y.from.localeCompare
 $("ta").onclick=async()=>{const f=$("tf").value,e=$("te").value,m=$("tr");if(!$("tn").value.trim()||!f||!e||e<f)return m.textContent="行き先、開始日、終了日を入れてください";
 try{const L=await pl($("tn").value);if(!L)return m.textContent="見つかりませんでした。緯度,経度でも入力できます";S.trips=(S.trips||[]).concat([{id:uid(),name:L.name,lat:L.lat,lon:L.lon,from:f,to:e}]);await persist();m.textContent="追加しました："+L.name;["tn","tf","te"].forEach(i=>$(i).value="");drawTrips();refresh()}catch(x){m.textContent="取得できませんでした（"+(x&&x.message||x)+"）"}};
 $("tl").onclick=async e=>{const r=e.target.closest("[data-id]");if(r&&e.target.dataset.x){S.trips=S.trips.filter(x=>x.id!==r.dataset.id);await persist();drawTrips();refresh()}};
+const WD="日月火水木金土";
+function drawRpt(){if(!$("rf").value){$("rt").value=today;$("rf").value=ago(90)}
+const tg=TAGS.filter(x=>x!=="薬"&&x!=="良好"&&S.recs.some(r=>r.kind==="症状"&&r.tag===x)),key=tg.join();
+if($("rtg").dataset.k!==key){$("rtg").dataset.k=key;$("rtg").innerHTML=tg.map(x=>`<label><input type="checkbox" value="${x}" checked> ${x}</label>`).join("")}}
+function mkReport(){const f=$("rf").value,e=$("rt").value;if(!f||!e||e<f)return null;
+const sel=[...document.querySelectorAll("#rtg input:checked")].map(x=>x.value),mode=$("rm").value,med=$("rmed").checked,cy=$("rcy").checked&&S.cy&&S.cy.start,multi=f.slice(0,4)!==e.slice(0,4);
+const fd=d=>(multi?d.slice(0,4)+"/":"")+(+d.slice(5,7))+"/"+(+d.slice(8,10)),
+rg=ds=>{ds=[...new Set(ds)].sort();const o=[];let a=null,b=null;const w=()=>o.push(a===b?fd(a):fd(a)+"〜"+fd(b));for(const d of ds){if(a&&addD(b,1)===d)b=d;else{if(a)w();a=b=d}}if(a)w();return o.join("、")};
+const rec=S.recs.filter(r=>r.kind==="症状"&&r.date>=f&&r.date<=e&&sel.includes(r.tag)),L=["【体調の記録】"+f.replace(/-/g,"/")+" 〜 "+e.replace(/-/g,"/")];
+if(!rec.length)L.push("","該当する症状の記録はありません。");
+if((mode==="s"||mode==="b")&&rec.length){L.push("","＜症状ごと＞");for(const tag of sel){const a=rec.filter(r=>r.tag===tag);if(!a.length)continue;const c={"軽":0,"中":0,"重":0};a.forEach(r=>c[r.sev]++);L.push(tag+": "+new Set(a.map(r=>r.date)).size+"日（軽"+c["軽"]+"・中"+c["中"]+"・重"+c["重"]+"）","　"+rg(a.map(r=>r.date)))}}
+if((mode==="d"||mode==="b")&&rec.length){L.push("","＜日付順＞");for(const d of [...new Set(rec.map(r=>r.date))].sort()){const m=med?S.med.filter(x=>x.t.slice(0,10)===d):[];L.push(fd(d)+"（"+WD[new Date(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8)).getDay()]+"） "+rec.filter(r=>r.date===d).map(r=>r.tag+"（"+r.sev+"）").join("、")+(m.length?"　服薬 "+m.map(x=>x.t.slice(11)+(x.name?" "+x.name:"")).join("、"):""))}}
+if(med&&(mode==="s"||mode==="b")){const ms=S.med.filter(x=>x.t.slice(0,10)>=f&&x.t.slice(0,10)<=e).sort((a,b)=>a.t.localeCompare(b.t));if(ms.length){L.push("","＜服薬＞");ms.forEach(x=>L.push(fd(x.t.slice(0,10))+" "+x.t.slice(11)+"頃"+(x.name?"（"+x.name+"）":"")))}}
+const grp=mode==="m"||mode==="w";
+if(grp&&rec.length){const bk=d=>{if(mode==="m")return[d.slice(0,7)+"-01",d.slice(0,7)+"-"+String(new Date(+d.slice(0,4),+d.slice(5,7),0).getDate()).padStart(2,"0")];const s=addD(d,-((new Date(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8)).getDay()+6)%7));return[s,addD(s,6)]},B={};
+rec.forEach(r=>{const k=bk(r.date);(B[k[0]]=B[k[0]]||{s:k[0],e:k[1],r:[]}).r.push(r)});
+const cn=b=>{const c={};b.r.forEach(r=>(c[r.tag]=c[r.tag]||new Set()).add(r.date));return c},U=mode==="m"?"月":"週";
+L.push("","＜"+U+"ごとの傾向＞");
+for(const k of Object.keys(B).sort()){const b=B[k],c=cn(b),s0=b.s<f?f:b.s,e0=b.e>e?e:b.e,pk=mode==="m"?ymd(new Date(+k.slice(0,4),+k.slice(5,7)-2,1)).slice(0,7)+"-01":addD(k,-7),pb=B[pk]&&!(b.s<f||b.e>e)&&!(B[pk].s<f||B[pk].e>e)?cn(B[pk]):null;
+L.push((mode==="m"?k.slice(0,4)+"年"+(+k.slice(5,7))+"月"+(s0!==b.s||e0!==b.e?"（"+fd(s0)+"〜"+fd(e0)+"）":""):fd(s0)+"〜"+fd(e0)+"の週")+": 症状のあった日 "+new Set(b.r.map(r=>r.date)).size+"日");
+Object.keys(c).sort((x,y)=>c[y].size-c[x].size).forEach(tag=>{const q={"軽":0,"中":0,"重":0};b.r.filter(r=>r.tag===tag).forEach(r=>q[r.sev]++);const df=pb?c[tag].size-(pb[tag]?pb[tag].size:0):null;
+L.push("　"+tag+" "+c[tag].size+"日（軽"+q["軽"]+"・中"+q["中"]+"・重"+q["重"]+"）"+(df===null?"":"　前"+U+"比"+(df>0?"+"+df:df<0?df:"±0"))+"　"+rg([...c[tag]]))});
+if(med){const n=S.med.filter(x=>x.t.slice(0,10)>=s0&&x.t.slice(0,10)<=e0).length;if(n)L.push("　服薬 "+n+"回")}
+if(cy){const ds=[];for(let d=s0;d<=e0;d=addD(d,1))if(cyc(d).mp)ds.push(d);if(ds.length)L.push("　月経期間（予定）: "+rg(ds))}}}
+if(cy&&!grp){const ds=[];for(let d=f;d<=e;d=addD(d,1))if(cyc(d).mp)ds.push(d);if(ds.length)L.push("","＜月経期間（予定）＞",rg(ds))}
+L.push("","※LINEのやり取りと手入力の記録をもとにしています。記録のない日は不明で、症状がなかったとは限りません。");
+return{text:L.join("\n"),rec,med:med?S.med.filter(x=>x.t.slice(0,10)>=f&&x.t.slice(0,10)<=e):[]}}
+const rmsg=m=>$("rmsg").textContent=m,csvDl=(n,s)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\uFEFF"+s],{type:"text/csv"}));a.download=n;a.click()};
+$("r3").onclick=()=>{$("rt").value=today;$("rf").value=ago(90)};$("r6").onclick=()=>{$("rt").value=today;$("rf").value=ago(180)};
+$("rg").onclick=()=>{const r=mkReport();if(!r)return alert("期間を正しく入れてください");$("rtx").textContent=r.text;$("rout").hidden=false;rmsg("")};
+$("rcp").onclick=async()=>{try{await navigator.clipboard.writeText($("rtx").textContent);rmsg("コピーしました")}catch(e){rmsg("コピーできませんでした。文章を長押しして選択してください")}};
+$("rsh").onclick=async()=>{try{await navigator.share({text:$("rtx").textContent})}catch(e){if(e&&e.name!=="AbortError")rmsg("この表示では共有できません。「コピー」を使ってください")}};
+$("rpr").onclick=()=>window.print();
+$("rcs").onclick=()=>{const r=mkReport();if(!r)return;csvDl("log-"+today.replace(/-/g,"")+".csv","日付,種別,内容,程度または時刻\n"+r.rec.map(x=>[x.date,"症状",x.tag,x.sev]).concat(r.med.map(x=>[x.t.slice(0,10),"服薬",x.name||"",x.t.slice(11)])).sort((a,b)=>a[0].localeCompare(b[0])).map(x=>x.join(",")).join("\n"))};
 $("mq").onclick=async e=>{if(e.target.dataset.n){S.med.push({id:uid(),t:nowL(),name:e.target.dataset.n,src:"手入力"});await persist();drawMeds()}};
 $("sa").onclick=async()=>{const n=$("sn").value.trim();if(n&&!S.meds.includes(n)){S.meds.push(n);await persist();$("sn").value="";drawMeds()}};
 $("sl").onclick=async e=>{const n=e.target.dataset.n;if(n){S.meds=S.meds.filter(x=>x!==n);await persist();drawMeds()}};
