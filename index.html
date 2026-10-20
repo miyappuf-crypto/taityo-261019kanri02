@@ -67,7 +67,7 @@ small{color:var(--sub)}
 </div>
 </main>
 <script>
-const SY=[["頭痛","頭痛|頭いた|頭が痛|ずつう"],["だるさ","だるい|ダルい|だるさ|だるー|だりぃ|倦怠|しんどい|ぐったり"],["眠気","眠い|ねむい|眠たい|ねむたい|眠気"],["めまい","めまい|目眩|ふらふら|ふらつ"],["吐き気","吐き気|はきけ|気持ち悪い|むかむか|吐いた"],["肩こり","肩こり|肩凝り|肩が凝|肩が痛"],["腹痛","腹痛|お腹痛|おなか痛|お腹が痛|胃痛|胃が痛"]].map(([t,r])=>[t,new RegExp(r)]);
+const SY=[["頭痛","頭痛|頭いた|頭が痛|ずつう"],["だるさ","だるい|ダルい|だるさ|だるー|だりぃ|倦怠|しんどい|ぐったり"],["眠気","眠い|ねむい|眠たい|ねむたい|眠気"],["めまい","めまい|目眩|ふらふら|ふらつ"],["吐き気","吐き気|はきけ|気持ち悪い|むかむか|吐いた"],["肩こり","肩こり|肩凝り|肩が凝|肩が痛"],["腹痛","腹痛|お腹痛|おなか痛|お腹が痛|胃痛|胃が痛"],["気分の落ち込み","落ち込|凹んで|凹んだ|憂うつ|憂鬱|ゆううつ|気分が沈|気持ちが沈|沈んで|やる気(が)?出ない|やる気(が)?出なく|無気力|泣きたい|泣きそう|涙が出"]].map(([t,r])=>[t,new RegExp(r)]);
 const TAGS=SY.map(s=>s[0]).concat(["薬","良好"]);
 const NEG=/ない|なくなっ|治っ|治まっ|引いた|マシ|良くなっ|楽になっ/;
 const MED=/薬[^\n]{0,12}(飲んだ|のんだ|飲みました|服用)|(飲んだ|のんだ|飲みました)[^\n]{0,4}薬/;
@@ -168,7 +168,7 @@ const R=stats(),D=daily();let h="";
 for(let i=0;i<7;i++){const d=new Date(T);d.setDate(d.getDate()+i);const k=ymd(d),x=D[k],fl=x?R.filter(r=>Math.abs(r.d)>=.3&&x[r.f]!=null&&ex(r,x[r.f])):[];
 h+=`<div class="box"><b>${d.getMonth()+1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）</b> `+cb(k)+(x?`<small>${x.wl?x.wl+"・":""}${x.t.toFixed(0)}℃・降水${x.pr.toFixed(0)}mm</small> `:"")+(!x?'<span class="flag">気象データなし</span>':fl.length?"":'<span class="chip">目立つ要因なし</span>')+
 fl.map(r=>`<p><span class="chip">${r.tag}</span> 注意度: ${Math.abs(r.d)>=.6?"高":"中"}<br><small>${F[r.f][0]} ${fm(r.f,x[r.f],1)}（症状の日 ${fm(r.f,r.mA)} ／ それ以外 ${fm(r.f,r.mB)}）。過去の症状日の${Math.round(r.rc*100)}%が該当${r.f==="dp"&&r.dir<0?tm(k):""}</small></p>`).join("")+"</div>"}
-el.innerHTML=h+(R.length?"":'<p class="note">傾向を出すには、症状の記録が各5日以上必要です。</p>')+'<p class="note">過去の傾向に基づく目安です。医療判断の代わりにはなりません。</p>'}
+el.innerHTML=h+(R.length?"":'<p class="note">傾向を出すには、症状の記録が各5日以上必要です。</p>')+'<p class="note">過去の傾向に基づく目安です。医療判断の代わりにはなりません。気分の落ち込みが強いときや長く続くときは、医療機関や身近な人への相談も検討してください。</p>'}
 function drawAna(){const R=stats(),D=daily(),seen={};$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>差の大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small>${IND(r.f)||seen[r.tag]++?"":mixT(r,D)}</div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。要因が多いほど偶然の差も出やすいため、記録が少ないうちは参考程度に。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
 const nowL=()=>{const d=new Date();return ymd(d)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 function drawMeds(){$("mq").innerHTML=S.meds.map(n=>`<button data-n="${esc(n)}">${esc(n)}</button>`).join("");$("sl").innerHTML=S.meds.map(n=>`<div class="ctl"><span>${esc(n)}</span><button class="alt" data-n="${esc(n)}">削除</button></div>`).join("");$("ml").innerHTML=S.meds.map(n=>`<option value="${esc(n)}">`).join("");const a=[...S.med].sort((x,y)=>y.t.localeCompare(x.t)).slice(0,15);
