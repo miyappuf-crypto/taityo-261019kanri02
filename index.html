@@ -70,8 +70,8 @@ small{color:var(--sub)}
 <div class="box"><b>相手の地域</b><div class="ctl"><input id="ln" placeholder="例: 柏市　または　35.867,139.976"><button id="ls">設定</button></div><p class="note" id="lr"></p></div>
 <div class="box"><b>お薬の登録</b><p class="note">登録すると、「記録」画面にワンタップのボタンが出ます。</p><div class="ctl"><input id="sn" placeholder="薬の名前"><button id="sa">追加</button></div><div id="sl"></div></div>
 <div class="box"><b>周期（月経）</b><p class="note">設定した周期を過去にさかのぼって当てはめ、症状との関係の分析にも使います。</p><div class="ctl"><label>直近の開始日 <input type="date" id="cs"></label><label>周期 <input type="number" id="cl" value="28" min="20" max="45" style="width:4.5em">日</label><label>期間 <input type="number" id="cd" value="6" min="2" max="10" style="width:4.5em">日</label></div><button id="cv">保存</button><p class="note" id="cr"></p></div>
-<div class="box"><b>セキュリティ</b><div class="ctl"><label>自動ロック <select id="lk"><option value="1">1分</option><option value="3" selected>3分</option><option value="10">10分</option></select></label></div><p class="note">操作がない時間が続くと、ロック画面に戻ります。アプリを離れて30秒以上たったときも、ロックされます。</p><b>パスフレーズの変更</b><div class="ctl"><input type="password" id="po" placeholder="現在" autocomplete="off"><input type="password" id="pn" placeholder="新しい（6文字以上）" autocomplete="off"><button id="pc">変更</button></div><p class="note" id="pr"></p></div>
-<div class="box"><b>バックアップ</b><div class="btns"><button id="bx">書き出す</button><label class="alt btn">復元<input type="file" id="bi" hidden></label></div><p class="note">書き出したファイルは暗号化されています。復元後は、そのときのパスフレーズで開きます。</p></div>
+<div class="box"><b>セキュリティ</b><div class="ctl"><label>自動ロック <select id="lk"><option value="1">1分</option><option value="3" selected>3分</option><option value="10">10分</option></select></label></div><p class="note">操作がない時間が続くと、ロック画面に戻ります。アプリを離れて30秒以上たったときも、ロックされます。</p><b>パスフレーズの変更</b><div class="ctl"><input type="password" id="po" placeholder="現在" autocomplete="off"><input type="password" id="pn" placeholder="新しい（10文字以上）" autocomplete="off"><button id="pc">変更</button></div><p class="note" id="pr"></p></div>
+<div class="box"><b>バックアップ</b><div class="btns"><button id="bx">書き出す</button><label class="alt btn">復元<input type="file" id="bi" hidden></label></div><p class="note">書き出したファイルは暗号化されており、中身は見えません。保存先は、iCloud Driveなど自分だけの場所にし、公開リポジトリには置かないでください。復元後は、そのときのパスフレーズで開きます。</p></div>
 <div class="box"><button id="wipe" class="alt">すべて削除</button></div>
 </section>
 </div>
@@ -145,8 +145,8 @@ const esc=s=>s.replace(/[&<>"]/g,c=>"&#"+c.charCodeAt(0)+";");
 const dk=async(pw,salt)=>crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]),{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
 async function persist(){const iv=crypto.getRandomValues(new Uint8Array(12)),c=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},KEY,enc.encode(JSON.stringify(S))));localStorage.hv=JSON.stringify({s:b64(SALT),i:b64(iv),c:b64(c)})}
 const raw=localStorage.hv,err=m=>{$("le").textContent=m;$("le").hidden=false};
-$("lm").textContent=raw?"パスフレーズを入力してください。":"新しいパスフレーズ（6文字以上）を決めてください。忘れるとデータは復元できません。";
-$("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6)return err("6文字以上にしてください");
+$("lm").textContent=raw?"パスフレーズを入力してください。":"新しいパスフレーズ（10文字以上）を決めてください。忘れるとデータは復元できません。";
+$("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6||(!raw&&pw.length<10))return err(raw?"6文字以上で入力してください":"10文字以上にしてください");
 try{if(raw){const o=JSON.parse(raw);SALT=ub(o.s);KEY=await dk(pw,SALT);S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(o.i)},KEY,ub(o.c))))}
 else{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(pw,SALT);S={loc:null,recs:[],med:[],meds:[]};await persist()}}catch(e){return err("パスフレーズが違います")}
 $("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.lock)$("lk").value=S.lock;arm();if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();drawTrips();refresh()};
@@ -213,7 +213,7 @@ let idle=null,hid=0;const arm=()=>{clearTimeout(idle);if(S)idle=setTimeout(()=>l
 ["click","touchstart","keydown"].forEach(e=>addEventListener(e,arm,{passive:true}));
 document.addEventListener("visibilitychange",()=>{const c=$("cov");if(document.hidden){hid=Date.now();c.style.display="block"}else{c.style.display="none";if(S&&Date.now()-hid>3e4)location.reload()}});
 $("lk").onchange=async e=>{S.lock=+e.target.value;await persist();arm()};
-$("pc").onclick=async()=>{const o=$("po").value,n=$("pn").value,m=$("pr");if(n.length<6)return m.textContent="新しいパスフレーズは6文字以上にしてください";
+$("pc").onclick=async()=>{const o=$("po").value,n=$("pn").value,m=$("pr");if(n.length<10)return m.textContent="新しいパスフレーズは10文字以上にしてください";
 try{const h=JSON.parse(localStorage.hv);await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(h.i)},await dk(o,ub(h.s)),ub(h.c))}catch(e){return m.textContent="現在のパスフレーズが違います"}
 SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(n,SALT);await persist();$("po").value=$("pn").value="";m.textContent="変更しました。以前に書き出したバックアップは、前のパスフレーズで開きます。必要なら書き出し直してください"};
 const HVS="surface_pressure,temperature_2m,relative_humidity_2m,weather_code,precipitation,cloud_cover,wind_speed_10m",addD=(k,n)=>{const a=k.split("-"),x=new Date(+a[0],a[1]-1,+a[2]);x.setDate(x.getDate()+n);return ymd(x)};
@@ -242,7 +242,7 @@ $("ls").onclick=async()=>{const v=$("ln").value.trim(),m=v.match(/^(-?\d+(?:\.\d
 try{let loc;if(m)loc={name:"緯度"+m[1]+"・経度"+m[2],lat:+m[1],lon:+m[2]};
 else{const r=(await J("https://geocoding-api.open-meteo.com/v1/search?count=5&language=ja&name="+encodeURIComponent(v))).results;if(!r)return $("lr").textContent="見つかりませんでした。"+hint;const g=r.find(x=>x.country_code==="JP")||r[0];loc={name:g.name+(g.admin1?"（"+g.admin1+"）":""),lat:g.latitude,lon:g.longitude}}
 S.loc=loc;await persist();$("lr").textContent="現在: "+S.loc.name;refresh()}catch(e){$("lr").textContent="取得できませんでした（"+(e&&e.message||e)+"）。"+hint}};
-$("bx").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([localStorage.hv],{type:"application/octet-stream"}));a.download="taityo-backup-"+today+".hvk";a.click()};
+$("bx").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([localStorage.hv],{type:"application/octet-stream"}));a.download="data-"+today.replace(/-/g,"")+".bin";a.click()};
 $("bi").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!(o.s&&o.i&&o.c))throw 0;if(confirm("現在のデータを、このバックアップで置き換えます。"))localStorage.hv=JSON.stringify(o),location.reload()}catch(x){alert("バックアップファイルを読み込めませんでした")}};
 $("wipe").onclick=()=>{if(confirm("端末内のすべてのデータを削除します。元に戻せません。")){localStorage.removeItem("hv");location.reload()}};
 </script>
