@@ -34,19 +34,26 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .row.off .ctl,.row.off .ex{opacity:.5}
 .btns{display:flex;flex-wrap:wrap;gap:8px}.alt{background:var(--accbg);color:var(--acc)}#msg{margin:8px 0 0;font-size:.9rem;color:var(--sub)}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button.alt{color:var(--acc)}}
 textarea{width:100%;height:120px;font:12px/1.5 ui-monospace,monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px}
-nav{display:flex;gap:6px;margin-bottom:14px}nav button{flex:1;padding:8px 4px}
+nav{display:flex;gap:6px;margin-bottom:14px}nav button{flex:1;padding:8px 2px;font-size:.85rem}
+#cov{position:fixed;inset:0;background:var(--bg);display:none;z-index:9}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}.cal i{font-style:normal;text-align:center;color:var(--sub);font-size:.8rem}
+.day{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 2px;min-height:58px;display:flex;flex-direction:column;align-items:center}
+.day b{font-size:.9rem}.day small{font-size:.85rem}.day em{font-style:normal;font-size:.7rem;color:var(--acc)}.day.mp{background:var(--accbg)}.day.td{border:2px solid var(--acc)}.day.sel{outline:2px solid var(--acc)}
+.pl{fill:none;stroke:var(--acc);stroke-width:2}.pb{fill:var(--acc);opacity:.18}.pt{fill:var(--sub);font-size:11px}.pn{stroke:var(--sub);stroke-dasharray:4 3}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button.day{color:var(--ink)}}
 .btn{display:inline-block;padding:10px 16px;border-radius:8px;cursor:pointer}
 small{color:var(--sub)}
 </style>
 </head>
 <body>
+<div id="cov"></div>
 <main>
 <div id="lock" class="box"><h1>体調予報</h1><p class="note" id="lm"></p>
 <div class="ctl"><input type="password" id="pw" autocomplete="off" aria-label="パスフレーズ"><button id="go">開く</button></div><p id="le" class="flag" hidden></p></div>
 <div id="app" hidden>
-<nav><button data-t="top">予報</button><button data-t="rec" class="alt">記録</button><button data-t="ana" class="alt">傾向</button><button data-t="set" class="alt">設定</button></nav>
+<nav><button data-t="top">予報</button><button data-t="rec" class="alt">記録</button><button data-t="cal" class="alt">月間</button><button data-t="ana" class="alt">傾向</button><button data-t="set" class="alt">設定</button></nav>
 <p class="note" id="wm"></p>
-<section id="top"></section>
+<section id="top"><div id="chart"></div><div id="fc"></div></section>
 <section id="rec" hidden>
 <div class="box"><b>体調を記録</b><p class="note">日付を選び、当てはまる症状を押します。記録は、傾向の分析と予報に使われます。</p><div class="ctl"><input type="date" id="ed"><select id="es"><option>軽</option><option selected>中</option><option>重</option></select></div><div class="btns" id="eq"></div><div id="el"></div></div>
 <div class="box"><b>服薬を記録</b><div class="btns" id="mq"></div><div class="ctl"><input id="mn" list="ml" placeholder="薬の名前（任意）"><datalist id="ml"></datalist><button id="mt">今飲んだ</button></div><div id="mlist"></div></div>
@@ -56,11 +63,13 @@ small{color:var(--sub)}
 <div class="box" id="list" hidden></div>
 <div class="box" id="act" hidden><button id="commit">確定して保存</button><p id="cm" role="status"></p></div>
 </section>
+<section id="cal" hidden></section>
 <section id="ana" hidden></section>
 <section id="set" hidden>
 <div class="box"><b>相手の地域</b><div class="ctl"><input id="ln" placeholder="例: 柏市　または　35.867,139.976"><button id="ls">設定</button></div><p class="note" id="lr"></p></div>
 <div class="box"><b>お薬の登録</b><p class="note">登録すると、「記録」画面にワンタップのボタンが出ます。</p><div class="ctl"><input id="sn" placeholder="薬の名前"><button id="sa">追加</button></div><div id="sl"></div></div>
 <div class="box"><b>周期（月経）</b><p class="note">設定した周期を過去にさかのぼって当てはめ、症状との関係の分析にも使います。</p><div class="ctl"><label>直近の開始日 <input type="date" id="cs"></label><label>周期 <input type="number" id="cl" value="28" min="20" max="45" style="width:4.5em">日</label><label>期間 <input type="number" id="cd" value="6" min="2" max="10" style="width:4.5em">日</label></div><button id="cv">保存</button><p class="note" id="cr"></p></div>
+<div class="box"><b>セキュリティ</b><div class="ctl"><label>自動ロック <select id="lk"><option value="1">1分</option><option value="3" selected>3分</option><option value="10">10分</option></select></label></div><p class="note">操作がない時間が続くと、ロック画面に戻ります。アプリを離れて30秒以上たったときも、ロックされます。</p><b>パスフレーズの変更</b><div class="ctl"><input type="password" id="po" placeholder="現在" autocomplete="off"><input type="password" id="pn" placeholder="新しい（6文字以上）" autocomplete="off"><button id="pc">変更</button></div><p class="note" id="pr"></p></div>
 <div class="box"><b>バックアップ</b><div class="btns"><button id="bx">書き出す</button><label class="alt btn">復元<input type="file" id="bi" hidden></label></div><p class="note">書き出したファイルは暗号化されています。復元後は、そのときのパスフレーズで開きます。</p></div>
 <div class="box"><button id="wipe" class="alt">すべて削除</button></div>
 </section>
@@ -139,7 +148,7 @@ $("lm").textContent=raw?"パスフレーズを入力してください。":"新�
 $("go").onclick=async()=>{const pw=$("pw").value;if(pw.length<6)return err("6文字以上にしてください");
 try{if(raw){const o=JSON.parse(raw);SALT=ub(o.s);KEY=await dk(pw,SALT);S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(o.i)},KEY,ub(o.c))))}
 else{SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(pw,SALT);S={loc:null,recs:[],med:[],meds:[]};await persist()}}catch(e){return err("パスフレーズが違います")}
-$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();refresh()};
+$("lock").hidden=true;$("app").hidden=false;$("lr").textContent=S.loc?"現在: "+S.loc.name:"";if(S.lock)$("lk").value=S.lock;arm();if(S.cy){$("cs").value=S.cy.start;$("cl").value=S.cy.len;$("cd").value=S.cy.dur}drawMeds();drawEnt();refresh()};
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("section").forEach(s=>s.hidden=s.id!==b.dataset.t);document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("alt",x!==b))});
 const J=async u=>{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()};
 function put(o){const q=o.hourly;q.time.forEach((k,i)=>{const g=n=>q[n]?q[n][i]:null,p=g("surface_pressure"),t=g("temperature_2m"),h=g("relative_humidity_2m");if(p!=null&&t!=null&&h!=null)H[k]={p,t,h,pr:g("precipitation")||0,cl:g("cloud_cover")||0,ws:g("wind_speed_10m")||0,wc:g("weather_code")==null?-1:g("weather_code")}})}
@@ -160,16 +169,16 @@ if(B.length<5)continue;
 for(const grp of [["dp","tr","h","t","dt","pr","cl","ws"],["mp","pm"]]){if(grp[0]==="mp"&&!(S.cy&&S.cy.start))continue;const L=[];
 for(const f of grp){const a=A.map(d=>D[d][f]),b=B.map(d=>D[d][f]),ma=mean(a),mb=mean(b),sp=Math.sqrt(((a.length-1)*sdv(a)**2+(b.length-1)*sdv(b)**2)/(a.length+b.length-2))||1,d=(ma-mb)/sp;
 L.push({tag,n:A.length,f,mA:ma,mB:mb,d,th:(ma+mb)/2,dir:Math.sign(ma-mb)||1,bn,a,ad:A,bd:B})}
-L.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d)).slice(0,grp[0]==="mp"?1:2).forEach(b=>{b.rc=b.a.filter(v=>ex(b,v)).length/b.a.length;R.push(b)})}}
+L.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d)).slice(0,grp[0]==="mp"?1:2).forEach(b=>{b.rc=b.a.filter(v=>ex(b,v)).length/b.a.length;const fl=Object.keys(D).filter(d=>d<today&&D[d][b.f]!=null&&ex(b,D[d][b.f])),cf=fl.filter(d=>sy[tag].has(d)||gd.has(d));b.pn=cf.length;b.ph=cf.filter(d=>sy[tag].has(d)).length;R.push(b)})}}
 return R.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d))}
 function tm(k){const ks=Object.keys(H).sort();let b=0,bi=-1;ks.forEach((q,i)=>{if(q.startsWith(k)&&i>=3){const v=H[ks[i-3]].p-H[q].p;if(v>b){b=v;bi=i}}});return bi>=0&&b>=2?`。気圧の低下が最大の時間帯: ${ks[bi].slice(11,13)}時ごろ（3時間で−${b.toFixed(1)}hPa）`:""}
-function drawTop(){const el=$("top");if(!S.loc){el.innerHTML='<div class="box">設定で相手の地域を決めると、予報が出ます。</div>';return}
+function drawTop(){const el=$("fc");drawChart();if(!S.loc){el.innerHTML='<div class="box">設定で相手の地域を決めると、予報が出ます。</div>';return}
 const R=stats(),D=daily();let h="";
 for(let i=0;i<7;i++){const d=new Date(T);d.setDate(d.getDate()+i);const k=ymd(d),x=D[k],fl=x?R.filter(r=>Math.abs(r.d)>=.3&&x[r.f]!=null&&ex(r,x[r.f])):[];
 h+=`<div class="box"><b>${d.getMonth()+1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）</b> `+cb(k)+(x?`<small>${x.wl?x.wl+"・":""}${x.t.toFixed(0)}℃・降水${x.pr.toFixed(0)}mm</small> `:"")+(!x?'<span class="flag">気象データなし</span>':fl.length?"":'<span class="chip">目立つ要因なし</span>')+
-fl.map(r=>`<p><span class="chip">${r.tag}</span> 注意度: ${Math.abs(r.d)>=.6?"高":"中"}<br><small>${F[r.f][0]} ${fm(r.f,x[r.f],1)}（症状の日 ${fm(r.f,r.mA)} ／ それ以外 ${fm(r.f,r.mB)}）。過去の症状日の${Math.round(r.rc*100)}%が該当${r.f==="dp"&&r.dir<0?tm(k):""}</small></p>`).join("")+"</div>"}
+fl.map(r=>`<p><span class="chip">${r.tag}</span> 注意度: ${Math.abs(r.d)>=.6?"高":"中"}<br><small>${F[r.f][0]} ${fm(r.f,x[r.f],1)}（症状の日 ${fm(r.f,r.mA)} ／ それ以外 ${fm(r.f,r.mB)}）。過去の症状日の${Math.round(r.rc*100)}%が該当${r.f==="dp"&&r.dir<0?tm(k):""}${r.pn>=3?`。この条件に当てはまった過去の日のうち、記録のある${r.pn}日中${r.ph}日（${Math.round(r.ph/r.pn*100)}%）で症状が記録されています`:""}</small></p>`).join("")+"</div>"}
 el.innerHTML=h+(R.length?"":'<p class="note">傾向を出すには、症状の記録が各5日以上必要です。</p>')+'<p class="note">過去の傾向に基づく目安です。医療判断の代わりにはなりません。気分の落ち込みが強いときや長く続くときは、医療機関や身近な人への相談も検討してください。</p>'}
-function drawAna(){const R=stats(),D=daily(),seen={};$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>差の大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small>${IND(r.f)||seen[r.tag]++?"":mixT(r,D)}</div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。要因が多いほど偶然の差も出やすいため、記録が少ないうちは参考程度に。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
+function drawAna(){const R=stats(),D=daily(),seen={};$("ana").innerHTML=R.length?R.map(r=>`<div class="box"><b>${r.tag}</b>（${r.n}日）<br>差の大きい要因（${IND(r.f)?"周期":"気象"}）: ${F[r.f][0]}<br><small>症状の日 ${fm(r.f,r.mA)} ／ ${r.bn} ${fm(r.f,r.mB)}（差の大きさ ${Math.abs(r.d).toFixed(2)}）</small>${r.pn>=3?`<br><small>当たり具合: この条件に当てはまった日で記録のある${r.pn}日のうち、${r.ph}日（${Math.round(r.ph/r.pn*100)}%）に症状あり</small>`:""}${IND(r.f)||seen[r.tag]++?"":mixT(r,D)}</div>`).join("")+'<p class="note">差の大きさは0.3以上で弱め、0.6以上でやや強い目安です。記載のない日は症状なしとは限らないため、目安として見てください。要因が多いほど偶然の差も出やすいため、記録が少ないうちは参考程度に。当たり具合は、条件を決めるのに使った同じ期間での確認なので、実際よりやや良く出ます。月経は、設定した周期を過去にさかのぼって当てはめた予定日なので、実際とずれていると精度が下がります。</p>':'<div class="box">地域を設定し、症状の記録が各5日以上たまると、傾向が出ます。</div>'}
 const nowL=()=>{const d=new Date();return ymd(d)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 function drawMeds(){$("mq").innerHTML=S.meds.map(n=>`<button data-n="${esc(n)}">${esc(n)}</button>`).join("");$("sl").innerHTML=S.meds.map(n=>`<div class="ctl"><span>${esc(n)}</span><button class="alt" data-n="${esc(n)}">削除</button></div>`).join("");$("ml").innerHTML=S.meds.map(n=>`<option value="${esc(n)}">`).join("");const a=[...S.med].sort((x,y)=>y.t.localeCompare(x.t)).slice(0,15);
 $("mlist").innerHTML=a.map(m=>`<div class="ctl" data-id="${m.id}"><input type="datetime-local" value="${m.t}"><span></span><button class="alt" data-x="1">削除</button></div>`).join("");
@@ -180,6 +189,31 @@ const a=S.recs.map((r,i)=>({r,i})).filter(x=>x.r.date>=ago(14)).sort((x,y)=>y.r.
 $("el").innerHTML=a.map(x=>`<div class="ctl" data-i="${x.i}"><span>${x.r.date.slice(5)} ${x.r.tag}${x.r.kind==="症状"?"（"+x.r.sev+"）":""}</span><button class="alt" data-x="1">削除</button></div>`).join("")}
 $("eq").onclick=async e=>{const g=e.target.dataset.t;if(!g)return;const date=$("ed").value||today,k=g==="良好"?"良好":"症状",sev=$("es").value,r=S.recs.find(x=>x.date===date&&x.tag===g&&x.kind===k);if(r)r.sev=sev;else S.recs.push({date,kind:k,tag:g,sev});await persist();drawEnt();drawTop();drawAna()};
 $("el").onclick=async e=>{const r=e.target.closest("[data-i]");if(r&&e.target.dataset.x){S.recs.splice(+r.dataset.i,1);await persist();drawEnt();drawTop();drawAna()}};
+function drawChart(){const ks=Object.keys(H).sort().filter(k=>k.slice(0,10)>=ago(3)&&k.slice(0,10)<=ago(-7)),el=$("chart");if(ks.length<24){el.innerHTML="";return}
+const W=640,Ht=190,pl=36,pb=22,ps=ks.map(k=>H[k].p),mn=Math.min(...ps)-1,mx=Math.max(...ps)+1,X=i=>pl+i*(W-pl-6)/(ks.length-1),Y=v=>8+(Ht-pb-8)*(1-(v-mn)/(mx-mn)),sy=new Set(S.recs.filter(r=>r.kind==="症状").map(r=>r.date)),nk=today+"T"+String(T.getHours()).padStart(2,"0")+":00";
+let bands="",ticks="",nowi=-1;
+ks.forEach((k,i)=>{if(k===nk)nowi=i;const d=k.slice(0,10);if(sy.has(d))bands+=`<rect class="pb" x="${X(i)-.5}" y="8" width="${(W-pl-6)/(ks.length-1)+1}" height="${Ht-pb-8}"/>`;if(k.slice(11,13)==="00")ticks+=`<text class="pt" x="${X(i)}" y="${Ht-6}" text-anchor="middle">${+d.slice(5,7)}/${+d.slice(8)}</text>`});
+el.innerHTML=`<div class="box"><b>気圧の推移</b> <small>色の帯は症状の記録がある日</small><svg viewBox="0 0 ${W} ${Ht}" width="100%" role="img" aria-label="気圧の推移">${bands}<text class="pt" x="2" y="${Y(mx)+10}">${mx.toFixed(0)}</text><text class="pt" x="2" y="${Y(mn)}">${mn.toFixed(0)}</text>${ticks}${nowi>=0?`<line class="pn" x1="${X(nowi)}" x2="${X(nowi)}" y1="8" y2="${Ht-pb}"/>`:""}<polyline class="pl" points="${ks.map((k,i)=>X(i).toFixed(1)+","+Y(H[k].p).toFixed(1)).join(" ")}"/></svg><small>単位 hPa／点線は現在</small></div>`}
+let cm=new Date(T.getFullYear(),T.getMonth(),1),cd=null;
+const EM={"晴れ":"☀️","曇り":"☁️","雨":"🌧️","雪":"❄️","雷雨":"⛈️","霧":"🌫️"};
+function drawCal(){const D=daily(),y=cm.getFullYear(),m=cm.getMonth(),n=new Date(y,m+1,0).getDate();
+let h=`<div class="box"><div class="ctl"><button class="alt" data-m="-1">←</button><b>${y}年${m+1}月</b><button class="alt" data-m="1">→</button></div><div class="cal">`+"日月火水木金土".split("").map(w=>`<i>${w}</i>`).join("");
+for(let i=0;i<cm.getDay();i++)h+="<span></span>";
+for(let d=1;d<=n;d++){const k=ymd(new Date(y,m,d)),r=S.recs.filter(x=>x.date===k&&x.kind==="症状"),ok=S.recs.some(x=>x.date===k&&x.kind==="良好"),md=S.med.some(x=>x.t.slice(0,10)===k),c=cyc(k);
+h+=`<button class="day${c.mp?" mp":""}${k===today?" td":""}${k===cd?" sel":""}" data-d="${k}"><b>${d}</b><small>${D[k]&&EM[D[k].wl]||""}</small><em>${r.length?"●".repeat(Math.min(r.length,3)):ok?"○":""}${md?"💊":""}</em></button>`}
+$("cal").innerHTML=h+'</div></div><div class="box" id="cdt"></div>';drawDay()}
+function drawDay(){const el=$("cdt");if(!cd){el.textContent="日付を選ぶと、その日の記録が出ます。　●症状　○良好　💊服薬　色つき=月経期間（予定）";return}
+const D=daily()[cd],r=S.recs.filter(x=>x.date===cd),md=S.med.filter(x=>x.t.slice(0,10)===cd).sort((a,b)=>a.t.localeCompare(b.t));
+el.innerHTML="<b>"+cd+"</b><br>"+(D?`<small>${D.wl||""} ${D.t.toFixed(0)}℃ 湿度${D.h.toFixed(0)}% 降水${D.pr.toFixed(0)}mm 気圧${D.p.toFixed(0)}hPa${D.dp!=null?"（前日差 "+D.dp.toFixed(1)+"）":""}</small><br>`:"")+(r.length?r.map(x=>x.tag+(x.kind==="症状"?"（"+x.sev+"）":"")).join("、"):"記録なし")+(md.length?"<br>服薬: "+md.map(x=>x.t.slice(11)+(x.name?" "+esc(x.name):"")).join("、"):"")+(cyc(cd).mp?"<br><small>月経期間（予定）</small>":"")}
+$("cal").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.m){cm=new Date(cm.getFullYear(),cm.getMonth()+ +b.dataset.m,1);cd=null}else if(b.dataset.d)cd=b.dataset.d;drawCal()};
+const _da=drawAna;drawAna=function(){_da();drawCal()};
+let idle=null,hid=0;const arm=()=>{clearTimeout(idle);if(S)idle=setTimeout(()=>location.reload(),(S.lock||3)*6e4)};
+["click","touchstart","keydown"].forEach(e=>addEventListener(e,arm,{passive:true}));
+document.addEventListener("visibilitychange",()=>{const c=$("cov");if(document.hidden){hid=Date.now();c.style.display="block"}else{c.style.display="none";if(S&&Date.now()-hid>3e4)location.reload()}});
+$("lk").onchange=async e=>{S.lock=+e.target.value;await persist();arm()};
+$("pc").onclick=async()=>{const o=$("po").value,n=$("pn").value,m=$("pr");if(n.length<6)return m.textContent="新しいパスフレーズは6文字以上にしてください";
+try{const h=JSON.parse(localStorage.hv);await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(h.i)},await dk(o,ub(h.s)),ub(h.c))}catch(e){return m.textContent="現在のパスフレーズが違います"}
+SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await dk(n,SALT);await persist();$("po").value=$("pn").value="";m.textContent="変更しました。以前に書き出したバックアップは、前のパスフレーズで開きます。必要なら書き出し直してください"};
 $("mq").onclick=async e=>{if(e.target.dataset.n){S.med.push({id:uid(),t:nowL(),name:e.target.dataset.n,src:"手入力"});await persist();drawMeds()}};
 $("sa").onclick=async()=>{const n=$("sn").value.trim();if(n&&!S.meds.includes(n)){S.meds.push(n);await persist();$("sn").value="";drawMeds()}};
 $("sl").onclick=async e=>{const n=e.target.dataset.n;if(n){S.meds=S.meds.filter(x=>x!==n);await persist();drawMeds()}};
